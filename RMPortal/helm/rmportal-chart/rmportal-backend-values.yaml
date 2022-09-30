@@ -1,0 +1,182 @@
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+#Name Used for apps
+fullnameOverride: "rmportal-backend"
+
+#Base image repo needs to be specified.
+deployment:
+  enabled: true
+image:
+  repository: 580285112064.dkr.ecr.ap-south-1.amazonaws.com
+  repoName: rmportal-backend
+  pullPolicy: IfNotPresent #Change as per requirements, 'IfNotPresent' is preffered
+  #Optional, Overrides the image tag whose default is the chart appVersion. Note: This will be overridden in spinnaker pileline
+  tag: "v5"
+
+#Specify container port where app will be listening/serving traffic
+containerPort: "5000"
+command: '["python", "manage.py"]'
+args: ""
+
+#No. of defaut replicas for the deployment, will be overrided with minReplicas if HPA autoscaling is enabled.
+replicaCount: 1
+
+#Specify resources for all the resources as per requiremnets, this will help to allocate pods efficiently.
+resources:
+  limits:
+    cpu: "500m"
+    memory: "500Mi"
+  requests:
+    cpu: "250m"
+    memory: "250Mi"
+
+#Specify the maximum number of Pods that can be unavailable during the rolling-update process (default 25%)
+maxUnavailable: ""
+#Specify the maximum number of Pods that can be created over the desired number of Pods during the rolling-update process (default 30%)
+maxSurge: ""
+
+#Enable for pod autoscaling with HPA
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  # targetMemoryUtilizationPercentage: 80
+
+#Enable livenessProbe for pod healthcheck
+livenessProbe:
+  tcpSocket:
+    port: 5000
+  periodSeconds: 15
+  timeoutSeconds: 5
+  failureThreshold: 2
+  successThreshold: 1
+  initialDelaySeconds: 15
+
+#Enable readinessProbe for pod healthcheck
+readinessProbe:
+  tcpSocket:
+    port: 5000
+  periodSeconds: 15
+  timeoutSeconds: 10
+  failureThreshold: 2
+  successThreshold: 2
+  initialDelaySeconds: 30
+
+#Pod Sechduling options
+#Add NodeAffinity to schedule pod on specific node labels with selection logic 'requiredDuringSchedulingIgnoredDuringExecution'
+affinity:
+  nodeAffinity:
+    enabled: true
+    affinityKey: "nodegrouptype"
+    affinityValue: "apps"
+# Does your app need Pod-AntiAffinity, this will ensure that each replica pod runs on a different worker-node (yes/no) ?
+# Recommendation: use this option if the number of replicas for your app is below 4
+  podAntiAffinity:
+    enabled: false
+#Schedule pod to a nodes with all the specified labels
+nodeSelector: {}
+# Specify tolerations to schedule pods with matching taints
+tolerations: []
+
+#List of Env Variables for applications
+env:
+  INDIRECT_ENROLMENT_CLIENT_URL: "http://rmportal-ui:80/reset_password/"
+
+secretRef:
+  - backend-secret
+
+#Optional, Enable service if required.
+service:
+  enabled: yes
+  #ClusterIP is preffered, we can use LoadBalancer if seperate ELB is required for the app
+  type: ClusterIP
+  port: 5000
+  targetPort: 5000
+  #Specify certificare arn  if type is LoadBalancer
+  sslcert: ""
+
+#Optional, Enable ingress if required.
+ingress:
+  enabled: no
+  #Optional, Specify only if we are using custom ingress class
+  className: ""
+  #Optional, Annotations for the ingress
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  #If Ingress enabled specify the hosts.
+  hosts:
+    - host: ""
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+#For adding tls certs for each hosts, This is not required as tls certs of ingress nginx ELB is used by default
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+# Does your app need a PodDisruptionBudget (yes/no) ?
+pdbRequired: "no"
+# if pdbRequired: "yes", please specify the 'maxUnavailable' value (value can be an integer or percentage eg: '1' pod or '10%' of pods)
+pdbmaxUnavailable: 30%
+
+volumeMountFsx:
+  enabled: false
+  volumeMounts:
+  - fsxMountPath: "/home/ubuntu/efs"
+    fsxClaimName: "algo-fsx"
+
+volumeMountLogs:
+  enabled: true
+  volumeMounts:
+  - logsMountPath: "/rm-portal-logs"
+    logshostPath: "/var/log/containers/"
+
+volumeMountSecret:
+  enabled: false
+  volumeMounts:
+  - secretMountPath: "/opt/secret"
+    secretName: "kafka-secret"
+
+cronJob:
+  enabled: false
+  schedule: ''
+  image:
+    repoName: xys
+    pullPolicy: IfNotPresent #Change as per requirements, 'IfNotPresent' is preffered
+    #Optional, Overrides the image tag whose default is the chart appVersion. Note: This will be overridden in spinnaker pileline
+    tag: ""
+  command: ["pipenv", "run", "vitals_daily_parameters"]
+  externalSecrets:
+    enabled: false
+    region: us-west-1
+
+#Required if we are pulling image from any other private repo
+imagePullSecrets: []
+
+nameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000

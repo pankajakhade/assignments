@@ -1,0 +1,133 @@
+{{- if .Values.deployment }}
+{{- if .Values.deployment.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "rmportal-chart.fullname" . }}
+  labels:
+    {{- include "rmportal-chart.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "rmportal-chart.selectorLabels" . | nindent 6 }}
+  strategy:
+    rollingUpdate:
+      {{- if .Values.maxSurge }}
+      maxSurge: {{ .Values.maxSurge }}%
+      {{- else }}
+      maxSurge: 30%
+      {{- end }}
+      {{- if .Values.maxUnavailable }}
+      maxUnavailable: {{ .Values.maxUnavailable }}%
+      {{- else }}
+      maxUnavailable: 30%
+      {{- end }}
+    type: RollingUpdate
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "rmportal-chart.labels" . | nindent 8 }}
+        {{- include "rmportal-chart.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "rmportal-chart.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}/{{ .Values.image.repoName }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.command }}
+          command: {{ .Values.command }}
+          {{- end }}
+          {{- if .Values.args }}
+          command: {{ .Values.args }}
+          {{- end }}
+          {{- if .Values.containerPort }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.containerPort }}
+              protocol: TCP
+          {{- end }}
+          {{- if .Values.volumeMountLogs }}
+          {{- if .Values.volumeMountLogs.enabled }}
+          volumeMounts:
+            {{- $counter := 0 -}}
+            {{- range .Values.volumeMountLogs.volumeMounts }}
+            - mountPath: {{ .logsMountPath }}
+              name: {{ printf "%s-%d" "logs" $counter }}
+              {{- if .logsMountSubPath }}
+              subPath: {{ .logsMountSubPath }}
+              {{- end }}
+            {{- $counter = add1 $counter -}}
+            {{- end }}
+          {{- end }}
+          {{- end }}
+          {{- if .Values.livenessProbe }}
+          livenessProbe:
+            {{- with .Values.livelinessProbe }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.readinessProbe }}
+          readinessProbe:
+            {{- with .Values.readinessProbe }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.env }}
+          env:
+            {{- include "helpers.env-variables" . | indent 12 }}
+          {{- end }}
+          {{- if or .Values.configmapRef .Values.secretRef }}
+          envFrom:
+            {{- include "helpers.secret-env-variables" . | indent 12 }}
+            {{- include "helpers.configmap-env-variables" . | indent 12 }}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.affinity }}
+      {{- if .Values.affinity.nodeAffinity.enabled }}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: {{ .Values.affinity.nodeAffinity.affinityKey }}
+                operator: In
+                values:
+                - {{ .Values.affinity.nodeAffinity.affinityValue }}
+      {{- end }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.volumeMountLogs.enabled }}
+      volumes:
+        {{- $counter := 0 -}}
+        {{- range .Values.volumeMountLogs.volumeMounts }}
+        - name: {{ required "Value is required!" (printf "%s-%d" "logs" $counter) }}
+          hostPath:
+            path: {{ .logshostPath }}
+        {{- $counter = add1 $counter -}}
+        {{- end }}
+      {{- end }}
+{{- end }}
+{{- end }}

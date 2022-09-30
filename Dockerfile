@@ -32,6 +32,8 @@ RUN apk --update-cache add \
     && rm glibc-bin-${GLIBC_VER}.apk \
     && rm -rf /var/cache/apk/* \
     && docker --version \
-    && aws --version
-
-CMD /bin/bash
+    && aws --version \
+    && wget https://get.helm.sh/helm-v3.10.0-linux-amd64.tar.gz \
+    && tar -zxvf helm-v3.10.0-linux-amd64.tar.gz \
+    && mv linux-amd64/helm /usr/local/bin/helm \
+    && helm version
